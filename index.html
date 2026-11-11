@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Solio projections vs actual result</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f6f6f4; --panel: #ffffff; --fg: #1d1d1b; --muted: #6a6a66; --line: #e3e3df;
+  --ok: #1a7f37; --c0: #2f6bd6; --c1: #e07b28; --grid: #ececea; --axis: #c9c9c4;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --radius: 10px; --pad: 1.25rem; --gap: 1rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #161616; --panel: #212121; --fg: #ececea; --muted: #a2a29d; --line: #343432;
+    --ok: #4cc26e; --c0: #6c9bf0; --c1: #f0a05c; --grid: #2c2c2a; --axis: #4a4a47;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.45;
+  padding: max(1.5rem, env(safe-area-inset-top, 0px)) clamp(1rem, 4vw, 2.5rem) max(2.5rem, env(safe-area-inset-bottom, 0px));
+}
+.pr { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; max-width: 72rem; margin-inline: auto; }
+.pr > *, .pr-grid > *, .pr-tiles > *, .pr-fpl > *, .pr-fpl-tiles > * { min-width: 0; }
+.pr-head { display: flex; align-items: flex-end; gap: 1.5rem; border-bottom: 1px solid var(--line); }
+.pr-head-text { flex: 1 1 auto; min-width: 0; padding-bottom: var(--pad); }
+.pr-james { flex: 0 0 auto; display: block; height: clamp(130px, 22vw, 220px); width: auto; margin-bottom: -1px; }
+.pr-head h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(1.7rem, 4vw, 2.3rem); line-height: 1.15; margin: 0; }
+.pr-season { margin: .3rem 0 0; color: var(--muted); font-size: .8rem; }
+.pr-takeaway { margin: .75rem 0 0; max-width: 62ch; }
+.pr-takeaway b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.pr-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--gap); }
+.pr-tile, .pr-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--pad); }
+.pr-num { display: block; font-family: var(--serif); font-weight: 400; font-size: 2.6rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.pr-label { display: block; margin-top: .3rem; }
+.pr-sub { display: block; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: var(--gap); align-items: start; }
+.pr-card h2, .pr-section-h { font-size: 1.05rem; font-weight: 500; margin: 0; }
+.pr-note, .pr-section-note { font-size: .8rem; color: var(--muted); margin: .3rem 0 1rem; max-width: 62ch; }
+.pr-section-note { margin-bottom: 0; }
+.pr-fpl { display: grid; gap: var(--gap); }
+.pr-fpl-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: var(--gap); }
+.pr-legend { display: flex; gap: 1rem; font-size: .8rem; color: var(--muted); margin-bottom: .5rem; }
+.pr-swatch { display: inline-block; width: .625rem; height: .625rem; border-radius: 2px; margin-right: .375rem; }
+.pr-sw-0 { background: var(--c0); } .pr-sw-1 { background: var(--c1); }
+.pr-chart { position: relative; min-height: 240px; }
+.pr-chart .pr-tick { fill: var(--muted); font-size: 12px; font-family: var(--sans); }
+.pr-tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.14); padding: .35rem .6rem; font-size: .8rem; white-space: nowrap; }
+.pr-tip-h { color: var(--muted); }
+.pr-scroll { max-height: 28rem; overflow: auto; }
+.pr-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.pr-table th { text-align: left; font-weight: 500; font-size: .8rem; color: var(--muted); padding: .35rem .6rem; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
+.pr-table td { padding: .35rem .6rem; border-bottom: 1px solid var(--line); }
+.pr-table .pr-r { text-align: right; } .pr-table .pr-c { text-align: center; }
+.pr-yes { color: var(--ok); font-weight: 600; } .pr-no { color: var(--muted); }
+.pr-tabs { display: flex; flex-wrap: wrap; gap: 2px; margin: .5rem 0 .3rem; border-bottom: 1px solid var(--line); }
+.pr-tab { appearance: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--muted); font: inherit; font-variant-numeric: tabular-nums; padding: .35rem .6rem; cursor: pointer; }
+.pr-tab:hover { color: var(--fg); }
+.pr-tab[aria-selected="true"] { color: var(--fg); border-bottom-color: currentColor; font-weight: 500; }
+.pr-tab:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 2px; }
+.pr-wide { overflow-x: auto; }
+.pr-league td:first-child, .pr-league th:first-child { width: 2.5rem; }
+.pr-league .pr-pts { font-weight: 600; }
+.pr-league td:last-child { white-space: nowrap; }
+.pr-league .pr-up { color: var(--ok); }
+.pr-league .pr-down { color: #c2412d; }
+@media (prefers-color-scheme: dark) { .pr-league .pr-down { color: #f07a63; } }
+.pr-league tbody tr:nth-child(4) td, .pr-league tbody tr:nth-child(17) td { border-bottom: 2px solid var(--axis); }
+.pr-club { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; }
+.pr-dot { flex: 0 0 auto; width: .95rem; height: .95rem; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); }
+@media (prefers-color-scheme: dark) { .pr-dot { box-shadow: inset 0 0 0 1px rgba(255,255,255,.3); } }
+.pr-vs { color: var(--muted); margin: 0 .4rem; }
+@media (max-width: 560px) {
+  body { padding-left: max(.85rem, env(safe-area-inset-left, 0px)); padding-right: max(.85rem, env(safe-area-inset-right, 0px)); }
+  .pr { gap: 1.1rem; }
+  .pr-tile, .pr-card { padding: 1rem; }
+  .pr-head { gap: .75rem; }
+  .pr-james { height: 120px; }
+  .pr-num { font-size: 2.2rem; }
+  .pr-table { font-size: .875rem; }
+  .pr-table th, .pr-table td { padding: .35rem .4rem; }
+  .pr-tab { padding: .35rem .45rem; }
+  .pr-match .pr-vs { display: none; }
+  .pr-match .pr-club { display: flex; }
+  .pr-match .pr-club + .pr-club { margin-top: .2rem; }
+  .pr-hide-sm { display: none; }
+  .pr-proj { font-size: .8rem; }
+  #matches .pr-table th, #matches .pr-table td { padding-left: .25rem; padding-right: .25rem; }
+  #matches .pr-table { font-size: .8rem; }
+  .pr-dot { display: none; }
+}
+.pr-proj { white-space: nowrap; }
+.pr-foot { font-size: .8rem; color: var(--muted); }
+.pr-foot summary { cursor: pointer; }
+.pr-foot p { margin: .3rem 0 0; max-width: 70ch; }
+</style>
+</head>
+<body>
+<div class="pr">
+  <header class="pr-head" id="top">
+    <div class="pr-head-text">
+      <h1>Solio projections vs actual result</h1>
+      <p class="pr-season">Premier League 2026/27: the betting-market projections Solio Analytics publishes before each gameweek, set against the final whistle</p>
+      <p class="pr-takeaway">Across <b data-t="matches">—</b> matches, the projections called the result right <b data-t="result_pct">—</b>% of the time and the exact score <b data-t="score_pct">—</b>% of the time.</p>
+    </div>
+  </header>
+
+  <section class="pr-tiles" aria-label="Season hit rates">
+    <div class="pr-tile">
+      <span class="pr-num"><span data-t="result_pct">—</span>%</span>
+      <span class="pr-label">Result right</span>
+      <span class="pr-sub"><span data-t="result_right">—</span> of <span data-t="matches">—</span> games: home win, draw or away win called correctly</span>
+    </div>
+    <div class="pr-tile">
+      <span class="pr-num"><span data-t="score_pct">—</span>%</span>
+      <span class="pr-label">Score right</span>
+      <span class="pr-sub"><span data-t="score_right">—</span> of <span data-t="matches">—</span> games: both numbers spot on</span>
+    </div>
+    <div class="pr-tile">
+      <span class="pr-num"><span data-t="reversed_pct">—</span>%</span>
+      <span class="pr-label">Backed the wrong team</span>
+      <span class="pr-sub">In <span data-t="reversed">—</span> of the <span data-t="winner_called">—</span> games where the projections picked a winner, the other team won</span>
+    </div>
+  </section>
+
+  <section class="pr-fpl" id="clean-sheets-goals">
+    <div>
+      <h2 class="pr-section-h">Clean sheets and teams scoring 2+</h2>
+      <p class="pr-section-note">How often the market’s calls came true. Each match counts twice, once for each team.</p>
+    </div>
+    <div class="pr-fpl-tiles">
+      <div class="pr-tile">
+        <span class="pr-num"><span data-t="cs_called_pct">—</span>%</span>
+        <span class="pr-label">Clean sheets</span>
+        <span class="pr-sub"><span data-t="cs_right">—</span> of the <span data-t="cs_called">—</span> times the opponent was projected under 1 goal, the clean sheet was kept</span>
+      </div>
+      <div class="pr-tile">
+        <span class="pr-num"><span data-t="g2_called_pct">—</span>%</span>
+        <span class="pr-label">Teams scoring 2+</span>
+        <span class="pr-sub"><span data-t="g2_right">—</span> of the <span data-t="g2_called">—</span> times a team was projected 2 goals or more, it scored 2+</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="pr-fpl" id="vs-xg">
+    <div>
+      <h2 class="pr-section-h">Projections vs xG</h2>
+      <p class="pr-section-note">How far Solio’s projected goals were from what each team actually created (xG) and actually scored, on average per team per game. Lower is closer.</p>
+    </div>
+    <div class="pr-fpl-tiles">
+      <div class="pr-tile">
+        <span class="pr-num"><span data-t="gap_xg">—</span></span>
+        <span class="pr-label">Goals away from the xG</span>
+        <span class="pr-sub">Across the <span data-t="xg_games">—</span> games with xG</span>
+      </div>
+      <div class="pr-tile">
+        <span class="pr-num"><span data-t="gap_goals">—</span></span>
+        <span class="pr-label">Goals away from the real score</span>
+        <span class="pr-sub">Same games, against the goals actually scored</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="pr-card" id="by-gameweek">
+    <h2>Hit rate by gameweek</h2>
+    <p class="pr-note">Share of each week’s games where the projections got the result, and the exact score, right.</p>
+    <div class="pr-legend"><span><span class="pr-swatch pr-sw-0"></span>Result right</span><span><span class="pr-swatch pr-sw-1"></span>Score right</span></div>
+    <div class="pr-chart" id="gw-chart"></div>
+  </section>
+
+  <div class="pr-grid">
+    <section class="pr-card" id="matches">
+      <h2>Match by match</h2>
+      <div class="pr-tabs" role="tablist" aria-label="Gameweek" id="gw-tabs"></div>
+      <p class="pr-note">Solio’s projected goals next to the real score and the match xG, home team first. Result and Score are judged on the projections rounded down to whole goals.</p>
+      <div class="pr-scroll">
+        <table class="pr-table">
+          <thead><tr>
+            <th class="pr-hide-sm">GW</th><th>Match</th><th class="pr-c">Solio</th><th class="pr-c">Actual</th><th class="pr-c">Final xG</th><th class="pr-c">Result</th><th class="pr-c">Score</th>
+          </tr></thead>
+          <tbody id="match-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="pr-card" id="by-team">
+      <h2>Which teams the market reads best</h2>
+      <p class="pr-note">Hit rates in games involving each team, home or away, best result rate first.</p>
+      <div class="pr-scroll">
+        <table class="pr-table">
+          <thead><tr>
+            <th>Team</th><th class="pr-r">Games</th><th class="pr-r">Result %</th><th class="pr-r">Score %</th>
+          </tr></thead>
+          <tbody id="team-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+
+  <section class="pr-card" id="league-table">
+    <h2>League table if Solio was 100% right</h2>
+    <p class="pr-note">The Premier League table built from the projected scores rounded down, as if every one had come true. “Actual” is where each team really sits after the same games; the arrow shows how far the projections had them above or below that.</p>
+    <div class="pr-wide">
+      <table class="pr-table pr-league">
+        <thead><tr>
+          <th class="pr-r">Pos</th><th>Team</th><th class="pr-r">P</th><th class="pr-r pr-hide-sm">W</th><th class="pr-r pr-hide-sm">D</th><th class="pr-r pr-hide-sm">L</th><th class="pr-r pr-hide-sm">GF</th><th class="pr-r pr-hide-sm">GA</th><th class="pr-r">GD</th><th class="pr-r">Pts</th><th class="pr-r">Actual</th>
+        </tr></thead>
+        <tbody id="league-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <details class="pr-foot">
+    <summary>How it’s counted</summary>
+    <p>Solio Analytics (@robtfpl) publishes each team’s projected goals from sharp betting markets before every gameweek; these are the final updates. To judge them like a scoreline, each team’s projected goals is rounded down to a whole number, so 1.84 v 0.95 becomes 1–0 and 2.67 v 0.53 becomes 2–0. Results, exact scores, backed the wrong team, clean sheets, teams scoring 2+ and the league table all use that rounded-down scoreline: a clean sheet is called when the opponent is projected under 1 goal, and 2+ is called when a team is projected 2 goals or more. Solio’s clean sheet percentages aren’t used.</p>
+    <p>Projections were copied from Solio’s weekly graphics. Results are full-time scores. Match xG comes from xG Stat; gameweek 2 and Newcastle v Everton aren’t included yet, so they show a dash and are left out of the xG comparison.</p>
+  </details>
+</div>
+
+<script>
+// ── Add each new gameweek here ──────────────────────────────────────────
+// [gameweek, home, away, home projected goals, away projected goals,
+//  home clean sheet %, away clean sheet %, actual home, actual away]
+const MATCHES = [
+  [1, "ARS", "COV", 2.57, 0.60, 54, 7, 3, 0],
+  [1, "EVE", "CRY", 1.46, 1.19, 29, 22, 2, 0],
+  [1, "NFO", "LEE", 1.43, 1.21, 29, 23, 0, 1],
+  [1, "BHA", "AVL", 1.59, 1.29, 26, 19, 4, 0],
+  [1, "NEW", "LIV", 1.35, 1.95, 13, 25, 2, 2],
+  [1, "HUL", "MUN", 0.78, 2.22, 10, 45, 2, 0],
+  [1, "IPS", "SUN", 1.25, 1.31, 26, 28, 2, 1],
+  [1, "BRE", "TOT", 1.56, 1.38, 24, 20, 3, 0],
+  [1, "MCI", "BOU", 2.34, 1.11, 32, 9, 2, 1],
+  [1, "FUL", "CHE", 1.18, 1.80, 15, 29, 2, 3],
+  [2, "CRY", "MCI", 1.05, 1.94, 13, 34, 1, 4],
+  [2, "BOU", "EVE", 1.57, 1.13, 31, 20, 1, 1],
+  [2, "TOT", "NEW", 1.64, 1.42, 23, 18, 0, 2],
+  [2, "LEE", "BRE", 1.35, 1.31, 26, 25, 1, 1],
+  [2, "MUN", "IPS", 2.22, 0.87, 41, 9, 5, 2],
+  [2, "LIV", "NFO", 2.10, 0.97, 37, 11, 2, 2],
+  [2, "COV", "HUL", 1.67, 1.00, 36, 18, 0, 1],
+  [2, "CHE", "BHA", 1.86, 1.19, 29, 14, 4, 3],
+  [2, "SUN", "FUL", 1.35, 1.18, 30, 25, 1, 0],
+  [2, "AVL", "ARS", 0.84, 1.90, 13, 42, 0, 1],
+  [3, "IPS", "LIV", 1.13, 2.34, 8, 31, 0, 2],
+  [3, "BRE", "SUN", 1.83, 0.93, 38, 14, 1, 1],
+  [3, "FUL", "CRY", 1.48, 1.22, 29, 22, 2, 3],
+  [3, "NFO", "TOT", 1.42, 1.26, 27, 23, 0, 0],
+  [3, "EVE", "MUN", 1.30, 1.68, 17, 26, 2, 2],
+  [3, "NEW", "BOU", 1.75, 1.39, 24, 16, 2, 2],
+  [3, "BHA", "LEE", 1.59, 1.11, 32, 19, 1, 1],
+  [3, "MCI", "COV", 2.98, 0.70, 48, 4, 1, 0],
+  [3, "HUL", "AVL", 1.03, 1.64, 18, 35, 0, 0],
+  [3, "ARS", "CHE", 1.87, 1.04, 34, 14, 2, 1],
+  [4, "BOU", "BRE", 1.60, 1.49, 22, 20, 2, 2],
+  [4, "CHE", "HUL", 2.74, 0.72, 47, 5, 2, 2],
+  [4, "LIV", "FUL", 2.26, 1.12, 31, 9, 0, 0],
+  [4, "SUN", "ARS", 0.74, 1.71, 16, 46, 0, 2],
+  [4, "MUN", "MCI", 1.44, 1.81, 15, 22, 0, 1],
+  [4, "AVL", "NFO", 1.47, 1.16, 31, 22, 1, 2],
+  [4, "CRY", "IPS", 1.76, 1.15, 31, 16, 2, 3],
+  [4, "TOT", "EVE", 1.72, 1.21, 28, 16, 0, 0],
+  [4, "COV", "BHA", 1.12, 1.73, 17, 32, 0, 5],
+  [4, "LEE", "NEW", 1.50, 1.30, 26, 21, 4, 1],
+  [5, "BRE", "CHE", 1.65, 1.69, 18, 19, 3, 0],
+  [5, "BHA", "ARS", 1.01, 1.86, 14, 35, 3, 0],
+  [5, "NEW", "HUL", 2.02, 1.03, 35, 12, 2, 1],
+  [5, "BOU", "LIV", 1.48, 1.81, 16, 22, 0, 1],
+  [5, "MCI", "SUN", 2.36, 0.72, 47, 8, 5, 3],
+  [5, "TOT", "AVL", 1.69, 1.20, 29, 17, 2, 3],
+  [5, "EVE", "IPS", 1.80, 1.07, 33, 15, 1, 0],
+  [5, "NFO", "COV", 1.91, 0.90, 39, 13, 0, 1],
+  [5, "LEE", "CRY", 1.84, 1.04, 33, 14, 0, 0],
+  [5, "FUL", "MUN", 1.35, 1.81, 15, 25, 1, 1],
+  [6, "ARS", "LEE", 2.04, 0.73, 47, 11, 2, 1],
+  [6, "CHE", "BOU", 1.93, 1.23, 28, 13, 5, 1],
+  [6, "SUN", "BHA", 1.25, 1.49, 22, 28, 0, 2],
+  [6, "CRY", "NFO", 1.32, 1.37, 24, 25, 3, 1],
+  [6, "LIV", "MCI", 1.45, 1.67, 18, 22, 0, 3],
+  [6, "AVL", "BRE", 1.46, 1.55, 21, 23, 2, 2],
+  [6, "IPS", "FUL", 1.42, 1.50, 22, 24, 2, 1],
+  [6, "MUN", "TOT", 2.04, 1.23, 28, 12, 1, 1],
+  [6, "HUL", "EVE", 1.09, 1.48, 21, 32, 2, 2],
+  [6, "COV", "NEW", 1.30, 1.67, 18, 27, 4, 1],
+  [7, "EVE", "CHE", 1.40, 1.67, 18, 24, 0, 2],
+  [7, "FUL", "HUL", 1.91, 0.97, 37, 14, 1, 0],
+  [7, "NEW", "AVL", 1.72, 1.46, 23, 17, 0, 1],
+  [7, "BHA", "CRY", 2.16, 1.02, 35, 10, 5, 0],
+  [7, "NFO", "ARS", 0.86, 1.79, 15, 41, 0, 1],
+  [7, "BRE", "LIV", 1.63, 1.53, 21, 20, 1, 2],
+  [7, "MCI", "IPS", 2.84, 0.92, 38, 4, 3, 2],
+  [7, "BOU", "SUN", 1.53, 1.15, 31, 21, 2, 0],
+  [7, "LEE", "MUN", 1.57, 1.37, 25, 20, 1, 1],
+  [7, "TOT", "COV", 2.18, 0.96, 37, 10, 3, 1],
+  [8, "IPS", "NFO", 1.29, 1.56, 21, 27, 1, 1],
+  [8, "ARS", "EVE", 1.98, 0.73, 47, 12, 2, 0],
+  [8, "CHE", "TOT", 2.04, 1.21, 28, 11, 0, 2],
+  [8, "HUL", "BRE", 1.06, 1.93, 13, 33, 1, 1],
+  [8, "MUN", "BOU", 1.67, 1.34, 26, 19, 0, 3],
+  [8, "AVL", "MCI", 1.15, 2.12, 11, 31, 2, 1],
+  [8, "COV", "FUL", 1.30, 1.57, 20, 27, 0, 1],
+  [8, "CRY", "NEW", 1.47, 1.68, 18, 22, 0, 2],
+  [8, "LIV", "BHA", 1.80, 1.42, 23, 15, 2, 0],
+  [8, "SUN", "LEE", 1.15, 1.32, 26, 31, 0, 0],
+  [9, "CHE", "MUN", 1.80, 1.31, 26, 16, 2, 0],
+  [9, "BRE", "NFO", 1.66, 1.30, 27, 19, 2, 0],
+  [9, "HUL", "IPS", 1.29, 1.42, 24, 27, 2, 2],
+  [9, "TOT", "CRY", 1.93, 1.03, 34, 13, 2, 0],
+  [9, "LIV", "ARS", 1.30, 1.43, 23, 27, 0, 1],
+  [9, "BOU", "LEE", 1.55, 1.14, 32, 21, 2, 0],
+  [9, "COV", "SUN", 1.17, 1.38, 25, 31, 3, 1],
+  [9, "MCI", "BHA", 2.13, 1.25, 27, 11, 0, 1],
+  [9, "AVL", "FUL", 1.66, 1.18, 30, 18, 1, 1],
+  [9, "NEW", "EVE", 1.55, 1.37, 25, 21, 0, 1],
+  [10, "EVE", "COV", 1.84, 0.95, 38, 15, 3, 1],
+  [10, "ARS", "HUL", 2.67, 0.53, 58, 5, 1, 0],
+  [10, "NFO", "MCI", 1.11, 1.87, 13, 31, 3, 1],
+  [10, "CRY", "LIV", 1.05, 2.10, 10, 33, 1, 3],
+  [10, "SUN", "CHE", 1.15, 1.68, 17, 31, 1, 0],
+  [10, "LEE", "TOT", 1.27, 1.33, 26, 27, 1, 0],
+  [10, "FUL", "NEW", 1.73, 1.24, 28, 16, 1, 1],
+  [10, "BHA", "BRE", 1.88, 1.25, 28, 14, 2, 0],
+  [10, "IPS", "BOU", 1.15, 1.73, 16, 31, 1, 2],
+  [10, "MUN", "AVL", 1.72, 1.41, 24, 17, 4, 4],
+];
+
+// Actual match xG from xG Stat: "gameweek-HOME-AWAY": [home xG, away xG]
+// Leave a match out if its xG isn't known yet; the page shows a dash.
+const XG = {
+    "1-ARS-COV": [2.30, 0.30],
+    "1-BHA-AVL": [3.51, 0.54],
+    "1-BRE-TOT": [4.90, 0.58],
+    "1-EVE-CRY": [1.48, 1.72],
+    "1-FUL-CHE": [2.01, 2.48],
+    "1-HUL-MUN": [1.59, 1.81],
+    "1-IPS-SUN": [0.86, 0.86],
+    "1-MCI-BOU": [2.09, 0.60],
+    "1-NEW-LIV": [1.18, 3.69],
+    "1-NFO-LEE": [0.92, 0.84],
+    "3-ARS-CHE": [2.57, 0.53],
+    "3-BHA-LEE": [2.02, 2.10],
+    "3-BRE-SUN": [1.37, 2.18],
+    "3-EVE-MUN": [1.42, 0.86],
+    "3-FUL-CRY": [4.52, 1.91],
+    "3-HUL-AVL": [0.59, 2.02],
+    "3-IPS-LIV": [0.86, 1.22],
+    "3-MCI-COV": [2.36, 1.05],
+    "3-NEW-BOU": [0.68, 1.68],
+    "3-NFO-TOT": [1.10, 1.20],
+    "4-AVL-NFO": [0.98, 2.16],
+    "4-BOU-BRE": [2.49, 0.51],
+    "4-CHE-HUL": [1.08, 1.92],
+    "4-COV-BHA": [2.08, 3.26],
+    "4-CRY-IPS": [1.22, 1.64],
+    "4-LEE-NEW": [2.48, 0.43],
+    "4-LIV-FUL": [1.33, 0.74],
+    "4-MUN-MCI": [0.81, 1.06],
+    "4-SUN-ARS": [2.15, 1.93],
+    "4-TOT-EVE": [0.81, 1.47],
+    "5-BHA-ARS": [2.47, 1.77],
+    "5-BOU-LIV": [1.03, 2.05],
+    "5-BRE-CHE": [2.47, 1.04],
+    "5-EVE-IPS": [2.36, 1.59],
+    "5-FUL-MUN": [1.23, 3.02],
+    "5-LEE-CRY": [1.54, 1.43],
+    "5-MCI-SUN": [3.28, 3.59],
+    "5-NEW-HUL": [1.77, 2.14],
+    "5-NFO-COV": [1.79, 0.89],
+    "5-TOT-AVL": [2.36, 1.96],
+    "6-ARS-LEE": [2.51, 1.01],
+    "6-AVL-BRE": [2.98, 1.38],
+    "6-CHE-BOU": [1.81, 1.78],
+    "6-COV-NEW": [1.68, 2.12],
+    "6-CRY-NFO": [2.82, 4.61],
+    "6-HUL-EVE": [1.07, 2.25],
+    "6-IPS-FUL": [1.52, 2.13],
+    "6-LIV-MCI": [1.73, 1.68],
+    "6-MUN-TOT": [0.94, 2.00],
+    "6-SUN-BHA": [0.59, 1.13],
+    "7-BHA-CRY": [2.42, 0.68],
+    "7-BOU-SUN": [4.26, 0.14],
+    "7-BRE-LIV": [1.06, 1.47],
+    "7-EVE-CHE": [0.59, 2.11],
+    "7-FUL-HUL": [1.72, 0.07],
+    "7-LEE-MUN": [1.46, 0.71],
+    "7-MCI-IPS": [3.38, 1.69],
+    "7-NEW-AVL": [1.92, 2.38],
+    "7-NFO-ARS": [0.92, 1.26],
+    "7-TOT-COV": [1.57, 0.87],
+    "8-ARS-EVE": [2.67, 0.63],
+    "8-AVL-MCI": [0.75, 1.95],
+    "8-CHE-TOT": [0.99, 0.97],
+    "8-COV-FUL": [0.60, 0.92],
+    "8-CRY-NEW": [3.11, 1.37],
+    "8-HUL-BRE": [1.84, 1.68],
+    "8-IPS-NFO": [0.87, 3.13],
+    "8-LIV-BHA": [1.24, 1.12],
+    "8-MUN-BOU": [1.89, 1.50],
+    "8-SUN-LEE": [1.08, 0.87],
+    "9-AVL-FUL": [2.45, 2.94],
+    "9-BOU-LEE": [1.78, 0.89],
+    "9-BRE-NFO": [0.89, 0.97],
+    "9-CHE-MUN": [2.89, 1.22],
+    "9-COV-SUN": [0.86, 3.50],
+    "9-HUL-IPS": [0.87, 1.72],
+    "9-LIV-ARS": [1.89, 0.64],
+    "9-MCI-BHA": [2.48, 1.15],
+    "9-TOT-CRY": [3.87, 0.36],
+    "10-ARS-HUL": [1.77, 0.89],
+    "10-BHA-BRE": [3.06, 0.60],
+    "10-CRY-LIV": [2.65, 2.00],
+    "10-EVE-COV": [1.75, 1.27],
+    "10-FUL-NEW": [1.22, 0.64],
+    "10-IPS-BOU": [1.41, 2.70],
+    "10-LEE-TOT": [3.01, 0.79],
+    "10-MUN-AVL": [3.26, 2.85],
+    "10-NFO-MCI": [0.98, 1.04],
+    "10-SUN-CHE": [2.21, 0.77]
+};
+// ────────────────────────────────────────────────────────────────────────
+
+(() => {
+  const sign = Math.sign;
+  const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
+
+  const scored = MATCHES.map(([gw, home, away, hx, ax, hcs, acs, ah, aa]) => {
+    const ph = Math.floor(hx), pa = Math.floor(ax);
+    return {
+      gw, home, away, hx, ax, hcs, acs, ph, pa, ah, aa, xg: XG[gw + '-' + home + '-' + away] || null,
+      result: sign(ph - pa) === sign(ah - aa),
+      score: ph === ah && pa === aa,
+      winnerCalled: ph !== pa,
+      reversed: ph !== pa && sign(ph - pa) === -sign(ah - aa),
+    };
+  });
+
+  // Season totals
+  const n = (f) => scored.filter(f).length;
+  const T = { matches: scored.length, result_right: n((r) => r.result), score_right: n((r) => r.score),
+    winner_called: n((r) => r.winnerCalled), reversed: n((r) => r.reversed) };
+  T.result_pct = pct(T.result_right, T.matches);
+  T.score_pct = pct(T.score_right, T.matches);
+  T.reversed_pct = pct(T.reversed, T.winner_called);
+
+  // Each team's side of each match
+  const sides = scored.flatMap((r) => [
+    { team: r.home, csCalled: r.pa === 0, csKept: r.aa === 0, g2Called: r.ph >= 2, g2Hit: r.ah >= 2 },
+    { team: r.away, csCalled: r.ph === 0, csKept: r.ah === 0, g2Called: r.pa >= 2, g2Hit: r.aa >= 2 },
+  ]);
+  const ns = (f) => sides.filter(f).length;
+  T.cs_called = ns((s) => s.csCalled); T.cs_right = ns((s) => s.csCalled && s.csKept);
+  T.g2_called = ns((s) => s.g2Called); T.g2_right = ns((s) => s.g2Called && s.g2Hit);
+  T.cs_called_pct = pct(T.cs_right, T.cs_called);
+  T.g2_called_pct = pct(T.g2_right, T.g2_called);
+  const withXg = scored.filter((r) => r.xg);
+  const gaps = withXg.flatMap((r) => [[r.hx, r.xg[0], r.ah], [r.ax, r.xg[1], r.aa]]);
+  T.xg_games = withXg.length;
+  T.gap_xg = gaps.length ? (gaps.reduce((a, [p, x]) => a + Math.abs(p - x), 0) / gaps.length).toFixed(2) : '—';
+  T.gap_goals = gaps.length ? (gaps.reduce((a, [p, , g]) => a + Math.abs(p - g), 0) / gaps.length).toFixed(2) : '—';
+
+  document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = String(T[el.dataset.t]); });
+
+  // Club icons: one colour = solid; [left, right] = split down the middle; { top, bottom } = split across
+  const CLUB_COLOURS = {
+    ARS: '#E8102A', AVL: ['#5E1A3C', '#9CC8EA'], BOU: ['#3A0B0B', '#C8102E'], BRE: ['#FFFFFF', '#D20A11'],
+    BHA: ['#4C6FD6', '#FFFFFF'], CHE: '#1F4E99', COV: ['#7FB2E5', '#FFFFFF'], CRY: ['#C8303A', '#4A6FD8'],
+    EVE: '#274488', FUL: ['#FFFFFF', '#000000'], HUL: '#F18A00', IPS: ['#1D4FA3', '#E4282E'],
+    LEE: ['#1D3F8F', '#FFE84D'], LIV: '#D62631', MCI: '#98C5E9', MUN: '#DA1B1E',
+    NEW: ['#000000', '#FFFFFF'], NFO: { top: '#E53233', bottom: '#FFFFFF' }, SUN: ['#E31B23', '#FFFFFF'], TOT: '#FFFFFF',
+  };
+  const club = (code) => {
+    const s = document.createElement('span'); s.className = 'pr-club';
+    const d = document.createElement('span'); d.className = 'pr-dot'; d.setAttribute('aria-hidden', 'true');
+    const c = CLUB_COLOURS[code] || '#999999';
+    d.style.background = typeof c === 'string' ? c
+      : Array.isArray(c) ? `linear-gradient(90deg, ${c[0]} 50%, ${c[1]} 50%)`
+      : `linear-gradient(180deg, ${c.top} 50%, ${c.bottom} 50%)`;
+    s.append(d, code); return s;
+  };
+  const clubCell = (tr, ...codes) => {
+    const td = document.createElement('td');
+    if (codes.length > 1) td.className = 'pr-match';
+    codes.forEach((c, i) => {
+      if (i) { const v = document.createElement('span'); v.className = 'pr-vs'; v.textContent = 'v'; td.append(v); }
+      td.append(club(c));
+    });
+    tr.append(td);
+  };
+
+  const cell = (tr, text, cls) => { const td = document.createElement('td'); td.textContent = text; if (cls) td.className = cls; tr.append(td); };
+
+  // League tables: rounded-down projected scores vs the real ones
+  const buildTable = (homeKey, awayKey) => {
+    const t = new Map();
+    const row = (team) => t.get(team) || t.set(team, { team, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0 }).get(team);
+    for (const r of scored) {
+      const hg = r[homeKey], ag = r[awayKey];
+      const H = row(r.home), A = row(r.away);
+      H.p++; A.p++; H.gf += hg; H.ga += ag; A.gf += ag; A.ga += hg;
+      if (hg > ag) { H.w++; A.l++; } else if (hg < ag) { A.w++; H.l++; } else { H.d++; A.d++; }
+    }
+    return [...t.values()].map((x) => ({ ...x, gd: x.gf - x.ga, pts: x.w * 3 + x.d }))
+      .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team));
+  };
+  const jamesTable = buildTable('ph', 'pa');
+  const realPos = new Map(buildTable('ah', 'aa').map((x, i) => [x.team, i + 1]));
+  const leagueBody = document.getElementById('league-rows');
+  jamesTable.forEach((x, i) => {
+    const tr = document.createElement('tr');
+    const pos = i + 1, real = realPos.get(x.team), diff = real - pos;
+    cell(tr, pos, 'pr-r'); clubCell(tr, x.team);
+    cell(tr, x.p, 'pr-r');
+    for (const k of ['w', 'd', 'l', 'gf', 'ga']) cell(tr, x[k], 'pr-r pr-hide-sm');
+    cell(tr, (x.gd > 0 ? '+' : '') + x.gd, 'pr-r');
+    cell(tr, x.pts, 'pr-r pr-pts');
+    const td = document.createElement('td'); td.className = 'pr-r';
+    td.textContent = String(real);
+    if (diff) {
+      const s = document.createElement('span');
+      s.className = diff > 0 ? 'pr-up' : 'pr-down';
+      s.textContent = (diff > 0 ? ' ▲' : ' ▼') + Math.abs(diff);
+      s.title = diff > 0 ? `Solio had them ${diff} place${diff > 1 ? 's' : ''} higher` : `Solio had them ${-diff} place${diff < -1 ? 's' : ''} lower`;
+      td.append(s);
+    }
+    tr.append(td);
+    leagueBody.append(tr);
+  });
+
+  // By team hit rates
+  const teams = new Map();
+  for (const r of scored) for (const t of [r.home, r.away]) {
+    const g = teams.get(t) || { team: t, m: 0, res: 0, sc: 0 };
+    g.m++; if (r.result) g.res++; if (r.score) g.sc++;
+    teams.set(t, g);
+  }
+  const teamBody = document.getElementById('team-rows');
+  [...teams.values()].map((g) => ({ ...g, rp: pct(g.res, g.m), sp: pct(g.sc, g.m) }))
+    .sort((a, b) => b.rp - a.rp || b.sp - a.sp || a.team.localeCompare(b.team))
+    .forEach((g) => {
+      const tr = document.createElement('tr');
+      clubCell(tr, g.team); cell(tr, g.m, 'pr-r'); cell(tr, g.rp, 'pr-r'); cell(tr, g.sp, 'pr-r');
+      teamBody.append(tr);
+    });
+
+  // Per gameweek
+  const gws = [...new Set(scored.map((r) => r.gw))].sort((a, b) => a - b).map((gw) => {
+    const rows = scored.filter((r) => r.gw === gw);
+    const res = rows.filter((r) => r.result).length, sc = rows.filter((r) => r.score).length;
+    return { gw, m: rows.length, res, sc, rp: pct(res, rows.length), sp: pct(sc, rows.length) };
+  });
+
+  // Tabs + match table
+  let pick = String(gws.length ? gws[gws.length - 1].gw : 'all');
+  const tabsEl = document.getElementById('gw-tabs');
+  const rowsEl = document.getElementById('match-rows');
+  const opts = [...gws.map((g) => [String(g.gw), 'GW' + g.gw, 'Gameweek ' + g.gw]), ['all', 'All', 'All gameweeks']];
+
+  const drawMatches = () => {
+    rowsEl.replaceChildren();
+    for (const r of scored.filter((d) => pick === 'all' || String(d.gw) === pick)) {
+      const tr = document.createElement('tr');
+      cell(tr, r.gw, 'pr-hide-sm'); clubCell(tr, r.home, r.away);
+      cell(tr, r.hx.toFixed(2) + '–' + r.ax.toFixed(2), 'pr-c pr-proj'); cell(tr, r.ah + '–' + r.aa, 'pr-c'); cell(tr, r.xg ? r.xg[0].toFixed(2) + '–' + r.xg[1].toFixed(2) : '—', 'pr-c pr-proj');
+      cell(tr, r.result ? 'Yes' : 'No', 'pr-c ' + (r.result ? 'pr-yes' : 'pr-no'));
+      cell(tr, r.score ? 'Yes' : 'No', 'pr-c ' + (r.score ? 'pr-yes' : 'pr-no'));
+      rowsEl.append(tr);
+    }
+  };
+  const choose = (v, focus) => {
+    pick = v;
+    tabsEl.querySelectorAll('.pr-tab').forEach((b) => {
+      const on = b.dataset.v === v;
+      b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1;
+      if (on && focus) b.focus();
+    });
+    drawMatches();
+  };
+  opts.forEach(([v, label, full], i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'pr-tab'; b.textContent = label; b.dataset.v = v;
+    b.setAttribute('role', 'tab'); b.setAttribute('aria-label', full);
+    b.addEventListener('click', () => choose(v));
+    b.addEventListener('keydown', (ev) => {
+      const j = ev.key === 'ArrowRight' ? i + 1 : ev.key === 'ArrowLeft' ? i - 1 : ev.key === 'Home' ? 0 : ev.key === 'End' ? opts.length - 1 : null;
+      if (j === null) return;
+      ev.preventDefault();
+      choose(opts[(j + opts.length) % opts.length][0], true);
+    });
+    tabsEl.append(b);
+  });
+  choose(pick);
+
+  // Chart
+  const chartEl = document.getElementById('gw-chart');
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.append(e); return e; };
+  const drawChart = () => {
+    chartEl.replaceChildren();
+    if (!gws.length) return;
+    const W = Math.max(280, chartEl.clientWidth || 600), H = 240, mt = 12, mb = 26;
+    const svg = mk('svg', { width: '100%', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Hit rate by gameweek' }, chartEl);
+    const y = (v) => (H - mb) - (v / 100) * (H - mb - mt);
+    const ticks = [0, 25, 50, 75, 100];
+    const probe = mk('text', { class: 'pr-tick' }, svg);
+    let tw = 0;
+    for (const t of ticks) { probe.textContent = t + '%'; tw = Math.max(tw, probe.getComputedTextLength()); }
+    probe.remove();
+    const ml = tw + 10, mr = 4;
+    const step = (W - ml - mr) / gws.length, band = step * 0.75;
+    const sub = band / 2, bw = Math.min(32, sub * 0.88);
+    const css = getComputedStyle(document.documentElement);
+    const colors = [css.getPropertyValue('--c0').trim(), css.getPropertyValue('--c1').trim()];
+    for (const t of ticks) {
+      mk('line', { x1: ml, x2: W - mr, y1: y(t), y2: y(t), stroke: t === 0 ? 'var(--axis)' : 'var(--grid)' }, svg);
+      mk('text', { class: 'pr-tick', x: ml - 6, y: y(t), dy: '0.32em', 'text-anchor': 'end' }, svg).textContent = t + '%';
+    }
+    const every = band < 22 ? 2 : 1;
+    gws.forEach((g, i) => {
+      const x0 = ml + i * step + (step - band) / 2;
+      [g.rp, g.sp].forEach((v, k) => {
+        mk('rect', { x: x0 + k * sub + (sub - bw) / 2, width: bw, y: y(v), height: y(0) - y(v), rx: 2, fill: colors[k] }, svg);
+      });
+      if (i % every === 0) mk('text', { class: 'pr-tick', x: x0 + band / 2, y: H - 8, 'text-anchor': 'middle' }, svg).textContent = 'GW' + g.gw;
+    });
+    const tip = document.createElement('div');
+    tip.className = 'pr-tip'; tip.hidden = true; chartEl.append(tip);
+    gws.forEach((g, i) => {
+      const hit = mk('rect', { x: ml + i * step, width: step, y: mt, height: H - mt - mb, fill: 'transparent' }, svg);
+      hit.addEventListener('pointermove', (ev) => {
+        tip.replaceChildren();
+        const h = document.createElement('div'); h.className = 'pr-tip-h'; h.textContent = 'Gameweek ' + g.gw; tip.append(h);
+        [['Result right', g.rp, g.res], ['Score right', g.sp, g.sc]].forEach(([label, p, c], k) => {
+          const d = document.createElement('div');
+          const sw = document.createElement('span'); sw.className = 'pr-swatch ' + (k ? 'pr-sw-1' : 'pr-sw-0');
+          d.append(sw, `${label}: ${p}% (${c} of ${g.m})`); tip.append(d);
+        });
+        tip.hidden = false;
+        const box = chartEl.getBoundingClientRect();
+        tip.style.left = Math.max(0, Math.min(box.width - tip.offsetWidth, ev.clientX - box.left + 12)) + 'px';
+        tip.style.top = Math.max(0, ev.clientY - box.top - tip.offsetHeight - 8) + 'px';
+      });
+      hit.addEventListener('pointerleave', () => { tip.hidden = true; });
+    });
+  };
+  drawChart();
+  let lastW = chartEl.clientWidth;
+  new ResizeObserver(() => { if (chartEl.clientWidth !== lastW) { lastW = chartEl.clientWidth; drawChart(); } }).observe(chartEl);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawChart);
+  if (document.fonts) document.fonts.ready.then(drawChart);
+})();
+</script>
+</body>
+</html>
